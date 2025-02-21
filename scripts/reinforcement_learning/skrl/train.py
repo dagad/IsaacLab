@@ -69,6 +69,9 @@ from datetime import datetime
 
 import skrl
 from packaging import version
+import torch
+import torch.distributed as dist
+from torch.nn.parallel import DistributedDataParallel as DDP
 
 # check for minimum supported skrl version
 SKRL_VERSION = "1.4.1"
@@ -112,9 +115,21 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     env_cfg.scene.num_envs = args_cli.num_envs if args_cli.num_envs is not None else env_cfg.scene.num_envs
     env_cfg.sim.device = args_cli.device if args_cli.device is not None else env_cfg.sim.device
 
-    # multi-gpu training config
+    # 분산 학습 설정
     if args_cli.distributed:
+        # 프로세스 그룹 초기화
+        dist.init_process_group(backend="nccl")
+        # 로컬 랭크에 따라 GPU 설정
         env_cfg.sim.device = f"cuda:{app_launcher.local_rank}"
+        torch.cuda.set_device(app_launcher.local_rank)
+        
+        # agent 모델을 DDP로 래핑
+        agent_cfg["agent"]["model"] = DDP(
+            agent_cfg["agent"]["model"],
+            device_ids=[app_launcher.local_rank],
+            output_device=app_launcher.local_rank
+        )
+
     # max iterations for training
     if args_cli.max_iterations:
         agent_cfg["trainer"]["timesteps"] = args_cli.max_iterations * agent_cfg["agent"]["rollouts"]
@@ -192,6 +207,10 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
 
     # close the simulator
     env.close()
+
+    # 학습 완료 후 정리
+    if args_cli.distributed:
+        dist.destroy_process_group()
 
 
 if __name__ == "__main__":
