@@ -25,10 +25,10 @@ def setup_distributed():
     """PyTorch DDP (Distributed Data Parallel) 초기화"""
     if torch.cuda.is_available() and torch.distributed.is_available():
         if not dist.is_initialized():
-        dist.init_process_group(backend="nccl")  # GPU 간 통신 최적화
-        local_rank = int(os.environ["LOCAL_RANK"])  # torchrun이 제공하는 환경 변수
-        torch.cuda.set_device(local_rank)  # 각 프로세스를 해당 GPU에 매핑
-        print(f"🔥 Process {dist.get_rank()} initialized on GPU {local_rank}")
+            dist.init_process_group(backend="nccl")  # GPU 간 통신 최적화
+            local_rank = int(os.environ["LOCAL_RANK"])  # torchrun이 제공하는 환경 변수
+            torch.cuda.set_device(local_rank)  # 각 프로세스를 해당 GPU에 매핑
+            print(f"🔥 Process {dist.get_rank()} initialized on GPU {local_rank}")
 
 # ✅ DDP 종료 함수
 def cleanup_distributed():
